@@ -1,0 +1,82 @@
+package com.analysis.mr;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+import com.analysis.format.NationOutputFormat;
+
+public class PeopleCountByNation {
+	
+	    public static Map<String,String> asmap = new HashMap<String, String>();
+		public static class NationCountMapper extends Mapper<LongWritable,Text,Text,IntWritable>{
+			private Text keyinfo = new Text();
+			private IntWritable one = new IntWritable(1);
+			public  void map(LongWritable key , Text value , Context context) throws IOException, InterruptedException{
+				//按天统计我们通过的人数
+				String messages[] =  value.toString().split(",");
+				String time = messages[0].substring(0,8);
+				String nation = messages[3].trim();
+				keyinfo.set(time+":"+nation);
+				context.write(keyinfo, one);
+			}
+		}
+	   
+		//reduce
+		public static class NationCountReducer extends Reducer<Text,IntWritable,Text,IntWritable>{
+			
+		
+			
+			private IntWritable valueInfo = new  IntWritable();
+			public void reduce(Text key , Iterable<IntWritable> values , Context context) throws IOException, InterruptedException{
+			   
+				//统计我们的nation数
+				int sum =0;
+				//System.out.println(key);
+				for(IntWritable value : values){
+					sum += value.get();
+				}
+				valueInfo.set(sum);		
+				context.write(key, valueInfo);
+			}
+		}
+	public static void main(String[] args) throws IOException, ClassNotFoundException, InterruptedException {
+		// TODO Auto-generated method stub
+		//加载map
+	     asmap.put("柯尔克孜族", "00"); asmap.put("维吾尔族","01");asmap.put("汉族", "02");asmap.put("哈萨克族", "03"); asmap.put("回族","04");asmap.put("柯尔克孜族", "06");
+	     asmap.put("蒙古族", "06"); asmap.put("塔吉克族","07");asmap.put("满族", "08");asmap.put("乌孜别克族", "09"); asmap.put("俄罗斯族","10");asmap.put("达斡尔族", "11");asmap.put("塔塔尔族", "12");
+		Configuration conf = new Configuration();
+		@SuppressWarnings("deprecation")
+		Job job = new Job(conf,"app1");
+		//配置我们的类
+		job.setJarByClass(PeopleCountByNation.class);
+		job.setMapperClass(NationCountMapper.class);
+		job.setReducerClass(NationCountReducer.class);
+		
+		//设置我们输入输出的格式路径
+		job.setOutputKeyClass(Text.class);
+		job.setOutputValueClass(IntWritable.class);
+		job.setInputFormatClass(TextInputFormat.class);
+		//job.setOutputFormatClass(TextOutputFormat.class);
+		job.setOutputFormatClass(NationOutputFormat.class);
+		
+		//设置我们的输入输出环境
+		TextInputFormat.setInputPaths(job, new Path("hdfs://localhost:9000/user/analysis/"));
+		FileOutputFormat.setOutputPath(job, new Path("hdfs://localhost:9000/user/analysisout"));
+		job.waitForCompletion(true);
+
+	}
+
+}
